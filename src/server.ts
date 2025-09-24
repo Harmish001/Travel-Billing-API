@@ -6,6 +6,7 @@ import connectDB from "./config/db";
 import "./config/passport"; // Initialize passport strategies
 import authRoutes from "./routes/auth";
 import vehicleRoutes from "./routes/vehicle.routes";
+import billingRoutes from "./routes/billing.routes";
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ connectDB();
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/billings", billingRoutes);
 
 // Basic route
 app.get("/", (req, res) => {
