@@ -7,6 +7,7 @@ import "./config/passport"; // Initialize passport strategies
 import authRoutes from "./routes/auth";
 import vehicleRoutes from "./routes/vehicle.routes";
 import billingRoutes from "./routes/billing.routes";
+import registerdRoutes from "./routes";
 
 dotenv.config();
 
@@ -29,11 +30,6 @@ app.use(passport.initialize());
 // Connect to Database
 connectDB();
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/vehicles", vehicleRoutes);
-app.use("/api/billings", billingRoutes);
-
 // Basic route
 app.get("/", (req, res) => {
   res.json({
@@ -43,27 +39,6 @@ app.get("/", (req, res) => {
       version: "1.0.0",
       environment: process.env.NODE_ENV || "development",
     },
-  });
-});
-
-// Health check route
-app.get("/health", (req, res) => {
-  res.json({
-    status: true,
-    message: "Server is healthy",
-    data: {
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-    },
-  });
-});
-
-// 404 handler
-app.use("*", (req, res) => {
-  res.status(404).json({
-    status: false,
-    message: "Route not found",
-    data: null,
   });
 });
 
@@ -84,3 +59,6 @@ app.listen(port, () => {
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`🔗 Health check: http://localhost:${port}/health`);
 });
+
+const router = registerdRoutes(app);
+app.use("/api", router);
