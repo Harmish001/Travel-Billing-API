@@ -1,14 +1,21 @@
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import { requireAuth } from '../middleware/auth';
-import AuthController from '../controllers/auth.controller';
+import {
+  register,
+  login,
+  getProfile,
+  logout,
+  forgotPassword,
+  resetPassword
+} from '../controllers/auth.controller';
 
 const router = Router();
 
-router.post('/register', AuthController.register.bind(AuthController));
-router.post('/login', AuthController.login.bind(AuthController));
-router.get('/me', requireAuth as any, (req: any, res: any) => AuthController.getProfile(req, res));
-router.post('/logout', requireAuth as any, (req: any, res: any) => AuthController.logout(req, res));
-router.post('/forgot-password', AuthController.forgotPassword.bind(AuthController));
-router.post('/reset-password', AuthController.resetPassword.bind(AuthController));
+router.post('/register', register as RequestHandler);
+router.post('/login', login as RequestHandler);
+router.get('/me', requireAuth as RequestHandler, getProfile as RequestHandler);
+router.post('/logout', requireAuth as RequestHandler, logout as RequestHandler);
+router.post('/forgot-password', forgotPassword as RequestHandler);
+router.post('/reset-password', resetPassword as RequestHandler);
 
 export default router;

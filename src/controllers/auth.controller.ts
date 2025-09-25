@@ -3,260 +3,277 @@ import passport from "passport";
 import User from "../models/User";
 import { AuthRequest } from "../middleware/auth";
 import JWTService from "../utils/jwt.service";
+import { ApiResponse } from "../types";
 
 interface RegisterRequest {
-  email: string;
-  password: string;
-  businessName: string;
-  role?: "user" | "admin";
+	email: string;
+	password: string;
+	businessName: string;
+	role?: "user" | "admin";
 }
 
 interface LoginRequest {
-  email: string;
-  password: string;
+	email: string;
+	password: string;
 }
 
 interface ForgotPasswordRequest {
-  email: string;
+	email: string;
 }
 
 interface ResetPasswordRequest {
-  token: string;
-  newPassword: string;
+	token: string;
+	newPassword: string;
 }
 
-export class AuthController {
-  async register(req: Request, res: Response): Promise<Response> {
-    try {
-      const {
-        email,
-        password,
-        businessName,
-        role = "user",
-      }: RegisterRequest = req.body;
+export const register = async (req: Request, res: Response) => {
+	try {
+		const {
+			email,
+			password,
+			businessName,
+			role = "user"
+		} = req.body as RegisterRequest;
 
-      if (!email || !password || !businessName) {
-        return res.status(400).json({
-          status: false,
-          message: "Email, password, and business name are required",
-          data: null,
-        });
-      }
+		if (!email || !password || !businessName) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Email, password, and business name are required",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      if (password.length < 6) {
-        return res.status(400).json({
-          status: false,
-          message: "Password must be at least 6 characters long",
-          data: null,
-        });
-      }
+		if (password.length < 6) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Password must be at least 6 characters long",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({
-          status: false,
-          message: "User with this email already exists",
-          data: null,
-        });
-      }
+		const existingUser = await User.findOne({ email });
+		if (existingUser) {
+			const response: ApiResponse = {
+				status: false,
+				message: "User with this email already exists",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      const newUser = await User.create({
-        email,
-        password,
-        businessName,
-        role,
-      });
+		const newUser = await User.create({
+			email,
+			password,
+			businessName,
+			role
+		});
 
-      const token = JWTService.generateToken({
-        userId: newUser._id.toString(),
-        email: newUser.email,
-        role: newUser.role,
-      });
+		const token = JWTService.generateToken({
+			userId: newUser._id.toString(),
+			email: newUser.email,
+			role: newUser.role
+		});
 
-      return res.status(201).json({
-        status: true,
-        message: "User registered successfully",
-        data: {
-          user: newUser,
-          token,
-        },
-      });
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      return res.status(500).json({
-        status: false,
-        message: "Registration failed",
-        data: null,
-      });
-    }
-  }
+		const response: ApiResponse = {
+			status: true,
+			message: "User registered successfully",
+			data: {
+				user: newUser,
+				token
+			}
+		};
+		return res.status(201).json(response);
+	} catch (error: any) {
+		console.error("Registration error:", error);
+		const response: ApiResponse = {
+			status: false,
+			message: "Registration failed",
+			data: null
+		};
+		return res.status(500).json(response);
+	}
+};
 
-  login(req: Request, res: Response): void {
-    passport.authenticate(
-      "local",
-      { session: false },
-      (err: any, user: any, info: any) => {
-        if (err) {
-          return res.status(500).json({
-            status: false,
-            message: "Login error",
-            data: null,
-          });
-        }
+export const login = (req: Request, res: Response) => {
+	passport.authenticate(
+		"local",
+		{ session: false },
+		(err: any, user: any, info: any) => {
+			if (err) {
+				const response: ApiResponse = {
+					status: false,
+					message: "Login error",
+					data: null
+				};
+				return res.status(500).json(response);
+			}
 
-        if (!user) {
-          return res.status(401).json({
-            status: false,
-            message: info?.message || "Invalid credentials",
-            data: null,
-          });
-        }
+			if (!user) {
+				const response: ApiResponse = {
+					status: false,
+					message: info?.message || "Invalid credentials",
+					data: null
+				};
+				return res.status(401).json(response);
+			}
 
-        const token = JWTService.generateToken({
-          userId: user._id.toString(),
-          email: user.email,
-          role: user.role,
-        });
+			const token = JWTService.generateToken({
+				userId: user._id.toString(),
+				email: user.email,
+				role: user.role
+			});
 
-        return res.json({
-          status: true,
-          message: "Login successful",
-          data: {
-            user,
-            token,
-          },
-        });
-      }
-    )(req, res);
-  }
+			const response: ApiResponse = {
+				status: true,
+				message: "Login successful",
+				data: {
+					user,
+					token
+				}
+			};
+			return res.json(response);
+		}
+	)(req, res);
+};
 
-  getProfile(req: AuthRequest, res: Response): Response {
-    return res.json({
-      status: true,
-      message: "Profile retrieved successfully",
-      data: {
-        user: req.user,
-      },
-    });
-  }
+export const getProfile = (req: AuthRequest, res: Response) => {
+	const response: ApiResponse = {
+		status: true,
+		message: "Profile retrieved successfully",
+		data: {
+			user: req.user
+		}
+	};
+	return res.json(response);
+};
 
-  logout(req: AuthRequest, res: Response): Response {
-    return res.json({
-      status: true,
-      message: "Logout successful",
-      data: null,
-    });
-  }
+export const logout = (req: AuthRequest, res: Response) => {
+	const response: ApiResponse = {
+		status: true,
+		message: "Logout successful",
+		data: null
+	};
+	return res.json(response);
+};
 
-  async forgotPassword(req: Request, res: Response): Promise<Response> {
-    try {
-      const { email }: ForgotPasswordRequest = req.body;
+export const forgotPassword = async (req: Request, res: Response) => {
+	try {
+		const { email } = req.body as ForgotPasswordRequest;
 
-      if (!email) {
-        return res.status(400).json({
-          status: false,
-          message: "Email is required",
-          data: null,
-        });
-      }
+		if (!email) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Email is required",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res.status(404).json({
-          status: false,
-          message: "No user found with this email address",
-          data: null,
-        });
-      }
+		const user = await User.findOne({ email });
+		if (!user) {
+			const response: ApiResponse = {
+				status: false,
+				message: "No user found with this email address",
+				data: null
+			};
+			return res.status(404).json(response);
+		}
 
-      const resetToken = JWTService.generateResetToken(user._id.toString());
+		const resetToken = JWTService.generateResetToken(user._id.toString());
 
-      return res.json({
-        status: true,
-        message: "Password reset instructions sent to your email",
-        data: {
-          resetToken:
-            process.env.NODE_ENV === "development" ? resetToken : null,
-        },
-      });
-    } catch (error: any) {
-      console.error("Forgot password error:", error);
-      return res.status(500).json({
-        status: false,
-        message: "Failed to process password reset request",
-        data: null,
-      });
-    }
-  }
+		const response: ApiResponse = {
+			status: true,
+			message: "Password reset instructions sent to your email",
+			data: {
+				resetToken: process.env.NODE_ENV === "development" ? resetToken : null
+			}
+		};
+		return res.json(response);
+	} catch (error: any) {
+		console.error("Forgot password error:", error);
+		const response: ApiResponse = {
+			status: false,
+			message: "Failed to process password reset request",
+			data: null
+		};
+		return res.status(500).json(response);
+	}
+};
 
-  async resetPassword(req: Request, res: Response): Promise<Response> {
-    try {
-      const { token, newPassword }: ResetPasswordRequest = req.body;
+export const resetPassword = async (req: Request, res: Response) => {
+	try {
+		const { token, newPassword } = req.body as ResetPasswordRequest;
 
-      if (!token || !newPassword) {
-        return res.status(400).json({
-          status: false,
-          message: "Reset token and new password are required",
-          data: null,
-        });
-      }
+		if (!token || !newPassword) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Reset token and new password are required",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({
-          status: false,
-          message: "Password must be at least 6 characters long",
-          data: null,
-        });
-      }
+		if (newPassword.length < 6) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Password must be at least 6 characters long",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      const decoded = JWTService.verifyResetToken(token);
+		const decoded = JWTService.verifyResetToken(token);
 
-      const user = await User.findById(decoded.userId);
-      if (!user) {
-        return res.status(404).json({
-          status: false,
-          message: "User not found",
-          data: null,
-        });
-      }
+		const user = await User.findById(decoded.userId);
+		if (!user) {
+			const response: ApiResponse = {
+				status: false,
+				message: "User not found",
+				data: null
+			};
+			return res.status(404).json(response);
+		}
 
-      user.password = newPassword;
-      await user.save();
+		user.password = newPassword;
+		await user.save();
 
-      return res.json({
-        status: true,
-        message: "Password reset successfully",
-        data: null,
-      });
-    } catch (error: any) {
-      console.error("Reset password error:", error);
+		const response: ApiResponse = {
+			status: true,
+			message: "Password reset successfully",
+			data: null
+		};
+		return res.json(response);
+	} catch (error: any) {
+		console.error("Reset password error:", error);
 
-      if (
-        error.name === "JsonWebTokenError" ||
-        error.message === "Invalid reset token"
-      ) {
-        return res.status(400).json({
-          status: false,
-          message: "Invalid reset token",
-          data: null,
-        });
-      }
+		if (
+			error.name === "JsonWebTokenError" ||
+			error.message === "Invalid reset token"
+		) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Invalid reset token",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      if (error.name === "TokenExpiredError") {
-        return res.status(400).json({
-          status: false,
-          message: "Reset token has expired",
-          data: null,
-        });
-      }
+		if (error.name === "TokenExpiredError") {
+			const response: ApiResponse = {
+				status: false,
+				message: "Reset token has expired",
+				data: null
+			};
+			return res.status(400).json(response);
+		}
 
-      return res.status(500).json({
-        status: false,
-        message: "Failed to reset password",
-        data: null,
-      });
-    }
-  }
-}
-
-export default new AuthController();
+		const response: ApiResponse = {
+			status: false,
+			message: "Failed to reset password",
+			data: null
+		};
+		return res.status(500).json(response);
+	}
+};

@@ -10,14 +10,6 @@ const registerdRoutes = (app: Application) => {
 	router.use("/vehicles", vehicleRoutes);
 	router.use("/billings", billingRoutes);
 	router.use("/settings", settingsRoutes);
-	// 404 handler
-	router.use("*", (req, res) => {
-		res.status(404).json({
-			status: false,
-			message: "Route not found",
-			data: null
-		});
-	});
 	// Health check route
 	router.get("/health", (req, res) => {
 		res.json({
@@ -27,6 +19,14 @@ const registerdRoutes = (app: Application) => {
 				timestamp: new Date().toISOString(),
 				uptime: process.uptime()
 			}
+		});
+	});
+	// 404 handler
+	router.use("*", (req, res) => {
+		res.status(404).json({
+			status: false,
+			message: "Route not found",
+			data: null
 		});
 	});
 	app.use("/api", router);
