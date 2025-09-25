@@ -1,7 +1,19 @@
+export type VehicleType = 
+	| "Car"
+	| "Truck"
+	| "Van"
+	| "Bus"
+	| "Motorcycle"
+	| "Auto Rickshaw"
+	| "Tempo Traveller"
+	| "Trailer"
+	| "Other";
+
 export interface VehicleInterface {
 	_id?: any;
 	userId: string;
 	vehicleNumber: string;
+	vehicleType: VehicleType;
 	createdAt?: Date;
 	updatedAt?: Date;
 }
@@ -25,8 +37,10 @@ export interface VehiclePaginationResponse {
 
 export interface CreateVehicleRequest {
 	vehicleNumber: string;
+	vehicleType: VehicleType;
 }
 
 export interface UpdateVehicleRequest {
 	vehicleNumber?: string;
+	vehicleType?: VehicleType;
 }

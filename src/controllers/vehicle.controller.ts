@@ -1,7 +1,8 @@
-import { Request, Response } from "express";
 import Vehicle from "../models/Vehicle";
 import { AuthRequest } from "../middleware/auth";
 import { ApiResponse } from "../types";
+import { CreateVehicleRequest, UpdateVehicleRequest } from "../types/vehicle";
+import { Response } from "express";
 
 // Create a new vehicle
 export const createVehicle = async (
@@ -9,7 +10,7 @@ export const createVehicle = async (
 	res: Response
 ): Promise<void> => {
 	try {
-		const { vehicleNumber } = req.body;
+		const { vehicleNumber, vehicleType } = req.body as CreateVehicleRequest;
 		const userId = req.user?._id;
 
 		if (!userId) {
@@ -32,7 +33,16 @@ export const createVehicle = async (
 			return;
 		}
 
-		// Check if vehicle number already exists for this user
+		if (!vehicleType) {
+			const response: ApiResponse = {
+				status: false,
+				message: "Vehicle type is required",
+				data: null
+			};
+			res.status(400).json(response);
+			return;
+		}
+
 		const existingVehicle = await Vehicle.findOne({
 			userId,
 			vehicleNumber: vehicleNumber.trim().toUpperCase()
@@ -50,7 +60,8 @@ export const createVehicle = async (
 
 		const vehicle = await Vehicle.create({
 			userId,
-			vehicleNumber: vehicleNumber.trim()
+			vehicleNumber: vehicleNumber.trim(),
+			vehicleType
 		});
 
 		const response: ApiResponse = {
@@ -191,7 +202,7 @@ export const updateVehicle = async (
 ): Promise<void> => {
 	try {
 		const { id } = req.params;
-		const { vehicleNumber } = req.body;
+		const { vehicleNumber, vehicleType } = req.body as UpdateVehicleRequest;
 		const userId = req.user?._id;
 
 		if (!userId) {
@@ -204,36 +215,55 @@ export const updateVehicle = async (
 			return;
 		}
 
-		if (!vehicleNumber || !vehicleNumber.trim()) {
+		const updateData: any = {};
+
+		if (vehicleNumber !== undefined) {
+			if (!vehicleNumber.trim()) {
+				const response: ApiResponse = {
+					status: false,
+					message: "Vehicle number cannot be empty",
+					data: null
+				};
+				res.status(400).json(response);
+				return;
+			}
+
+			const existingVehicle = await Vehicle.findOne({
+				userId,
+				vehicleNumber: vehicleNumber.trim().toUpperCase(),
+				_id: { $ne: id }
+			});
+
+			if (existingVehicle) {
+				const response: ApiResponse = {
+					status: false,
+					message: "Vehicle number already exists",
+					data: null
+				};
+				res.status(409).json(response);
+				return;
+			}
+
+			updateData.vehicleNumber = vehicleNumber.trim();
+		}
+
+		if (vehicleType !== undefined) {
+			updateData.vehicleType = vehicleType;
+		}
+
+		if (Object.keys(updateData).length === 0) {
 			const response: ApiResponse = {
 				status: false,
-				message: "Vehicle number is required",
+				message: "No valid fields provided for update",
 				data: null
 			};
 			res.status(400).json(response);
 			return;
 		}
 
-		// Check if the new vehicle number already exists for this user (excluding current vehicle)
-		const existingVehicle = await Vehicle.findOne({
-			userId,
-			vehicleNumber: vehicleNumber.trim().toUpperCase(),
-			_id: { $ne: id }
-		});
-
-		if (existingVehicle) {
-			const response: ApiResponse = {
-				status: false,
-				message: "Vehicle number already exists",
-				data: null
-			};
-			res.status(409).json(response);
-			return;
-		}
-
 		const vehicle = await Vehicle.findOneAndUpdate(
 			{ _id: id, userId },
-			{ vehicleNumber: vehicleNumber.trim() },
+			updateData,
 			{ new: true, runValidators: true }
 		);
 
@@ -367,6 +397,41 @@ export const getVehicleStats = async (
 		const response: ApiResponse = {
 			status: false,
 			message: "Failed to retrieve vehicle statistics",
+			data: null
+		};
+		res.status(500).json(response);
+	}
+};
+
+export const getVehicleTypes = async (
+	req: AuthRequest,
+	res: Response
+): Promise<void> => {
+	try {
+		const vehicleTypes = [
+			"Car",
+			"Truck",
+			"Van",
+			"Bus",
+			"Motorcycle",
+			"Auto Rickshaw",
+			"Tempo Traveller",
+			"Trailer",
+			"Other"
+		];
+
+		const response: ApiResponse = {
+			status: true,
+			message: "Vehicle types retrieved successfully",
+			data: vehicleTypes
+		};
+
+		res.status(200).json(response);
+	} catch (error: any) {
+		console.error("Get vehicle types error:", error);
+		const response: ApiResponse = {
+			status: false,
+			message: "Failed to retrieve vehicle types",
 			data: null
 		};
 		res.status(500).json(response);

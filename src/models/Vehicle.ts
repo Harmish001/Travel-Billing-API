@@ -1,8 +1,10 @@
 import mongoose, { Document, Schema } from "mongoose";
+import { VehicleType } from "../types/vehicle";
 
 export interface VehicleDocument extends Document {
 	userId: mongoose.Types.ObjectId;
 	vehicleNumber: string;
+	vehicleType: VehicleType;
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -13,14 +15,22 @@ const vehicleSchema = new Schema<VehicleDocument>(
 			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: [true, "User ID is required"],
-			index: true // Index for faster queries by user
+			index: true
 		},
 		vehicleNumber: {
 			type: String,
 			required: [true, "Vehicle number is required"],
 			trim: true,
-			uppercase: true, // Store vehicle numbers in uppercase for consistency
+			uppercase: true,
 			maxlength: [20, "Vehicle number must be less than 20 characters"]
+		},
+		vehicleType: {
+			type: String,
+			required: [true, "Vehicle type is required"],
+			enum: {
+				values: ["Car", "Truck", "Van", "Bus", "Motorcycle", "Auto Rickshaw", "Tempo", "Trailer", "Other"],
+				message: "Invalid vehicle type. Must be one of: Car, Truck, Van, Bus, Motorcycle, Auto Rickshaw, Tempo, Trailer, Other"
+			}
 		}
 	},
 	{

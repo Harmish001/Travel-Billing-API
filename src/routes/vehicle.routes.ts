@@ -7,6 +7,7 @@ import {
   updateVehicle,
   deleteVehicle,
   getVehicleStats,
+  getVehicleTypes,
 } from "../controllers/vehicle.controller";
 
 const router = Router();
@@ -39,6 +40,13 @@ router.get("/", getVehicles as RequestHandler);
  * @access  Private
  */
 router.get("/stats", getVehicleStats as RequestHandler);
+
+/**
+ * @route   GET /api/vehicles/types
+ * @desc    Get all available vehicle types
+ * @access  Private
+ */
+router.get("/types", getVehicleTypes as RequestHandler);
 
 /**
  * @route   GET /api/vehicles/:id
