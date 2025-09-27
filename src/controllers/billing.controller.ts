@@ -37,6 +37,7 @@ export const createBilling = async (
 		const {
 			companyName,
 			vehicleId,
+			vehicleIds,
 			billingDate,
 			recipientName,
 			recipientAddress,
@@ -61,7 +62,7 @@ export const createBilling = async (
 		// Validate required fields
 		if (
 			!companyName ||
-			!vehicleId ||
+			(!vehicleId && (!vehicleIds || vehicleIds.length === 0)) ||
 			!recipientName ||
 			!recipientAddress ||
 			!workingTime ||
@@ -87,23 +88,56 @@ export const createBilling = async (
 			return;
 		}
 
-		// Verify that the vehicle belongs to the user
-		const vehicle = await Vehicle.findOne({ _id: vehicleId, userId });
-		if (!vehicle) {
+		// Verify that the vehicle(s) belong to the user
+		let vehicleIdsToUse: string[] = [];
+		
+		// Handle single vehicleId (backward compatibility)
+		if (vehicleId && !vehicleIds) {
+			const vehicle = await Vehicle.findOne({ _id: vehicleId, userId });
+			if (!vehicle) {
+				const response: ApiResponse = {
+					status: false,
+					message: "Vehicle not found or doesn't belong to user",
+					data: null
+				};
+				res.status(404).json(response);
+				return;
+			}
+			vehicleIdsToUse = [vehicleId];
+		}
+		// Handle multiple vehicleIds
+		else if (vehicleIds && vehicleIds.length > 0) {
+			// Verify all vehicles belong to the user
+			const vehicles = await Vehicle.find({ 
+				_id: { $in: vehicleIds }, 
+				userId 
+			});
+			
+			if (vehicles.length !== vehicleIds.length) {
+				const response: ApiResponse = {
+					status: false,
+					message: "One or more vehicles not found or don't belong to user",
+					data: null
+				};
+				res.status(404).json(response);
+				return;
+			}
+			
+			vehicleIdsToUse = vehicleIds;
+		} else {
 			const response: ApiResponse = {
 				status: false,
-				message: "Vehicle not found or doesn't belong to user",
+				message: "Either vehicleId or vehicleIds must be provided",
 				data: null
 			};
-			res.status(404).json(response);
+			res.status(400).json(response);
 			return;
 		}
 
-		// Create billing (auto-calculation will be handled by pre-save middleware)
-		const billing = await Billing.create({
+		// Create billing with support for multiple vehicles
+		const billingData: any = {
 			userId,
 			companyName: companyName.trim(),
-			vehicleId,
 			billingDate: billingDate ? new Date(billingDate) : new Date(),
 			recipientName: recipientName.trim(),
 			recipientAddress: recipientAddress.trim(),
@@ -112,10 +146,23 @@ export const createBilling = async (
 			quantity,
 			rate,
 			isCompleted: true
-		});
+		};
+
+		// Set vehicleId (single) or vehicleIds (multiple) based on what was provided
+		if (vehicleIdsToUse.length === 1) {
+			billingData.vehicleId = vehicleIdsToUse[0];
+		} else {
+			billingData.vehicleId = vehicleIdsToUse[0]; // Keep first as primary
+			billingData.vehicleIds = vehicleIdsToUse; // Store all vehicles
+		}
+
+		const billing = await Billing.create(billingData);
 
 		// Populate vehicle information
 		await billing.populate("vehicleId", "vehicleNumber");
+		if (vehicleIdsToUse.length > 1) {
+			await billing.populate("vehicleIds", "vehicleNumber");
+		}
 
 		const response: ApiResponse = {
 			status: true,
@@ -242,6 +289,9 @@ export const getBillingById = async (
 		const billing = await Billing.findOne({ _id: id, userId }).populate(
 			"vehicleId",
 			"vehicleNumber"
+		).populate(
+			"vehicleIds",
+			"vehicleNumber"
 		);
 
 		if (!billing) {
@@ -293,7 +343,7 @@ export const updateBilling = async (
 		}
 
 		// If vehicleId is being updated, verify it belongs to the user
-		if (updateData.vehicleId) {
+		if (updateData.vehicleId && !updateData.vehicleIds) {
 			const vehicle = await Vehicle.findOne({
 				_id: updateData.vehicleId,
 				userId
@@ -302,6 +352,24 @@ export const updateBilling = async (
 				const response: ApiResponse = {
 					status: false,
 					message: "Vehicle not found or doesn't belong to user",
+					data: null
+				};
+				res.status(404).json(response);
+				return;
+			}
+		}
+		
+		// If vehicleIds is being updated, verify all vehicles belong to the user
+		if (updateData.vehicleIds && updateData.vehicleIds.length > 0) {
+			const vehicles = await Vehicle.find({ 
+				_id: { $in: updateData.vehicleIds }, 
+				userId 
+			});
+			
+			if (vehicles.length !== updateData.vehicleIds.length) {
+				const response: ApiResponse = {
+					status: false,
+					message: "One or more vehicles not found or don't belong to user",
 					data: null
 				};
 				res.status(404).json(response);
@@ -348,7 +416,7 @@ export const updateBilling = async (
 			{ _id: id, userId },
 			cleanedData,
 			{ new: true, runValidators: true }
-		).populate("vehicleId", "vehicleNumber");
+		).populate("vehicleId", "vehicleNumber").populate("vehicleIds", "vehicleNumber");
 
 		if (!billing) {
 			const response: ApiResponse = {
@@ -415,7 +483,7 @@ export const deleteBilling = async (
 			_id: id,
 			userId,
 			isCompleted: true
-		}).populate("vehicleId", "vehicleNumber");
+		}).populate("vehicleId", "vehicleNumber").populate("vehicleIds", "vehicleNumber");
 
 		if (!billing) {
 			const response: ApiResponse = {

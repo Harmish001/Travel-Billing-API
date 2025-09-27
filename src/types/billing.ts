@@ -4,6 +4,7 @@ export interface BillingInterface {
 	userId: string;
 	companyName: string;
 	vehicleId: string;
+	vehicleIds?: string[]; // Support for multiple vehicles
 	billingDate: Date;
 	recipientName: string;
 	recipientAddress: string;
@@ -21,7 +22,8 @@ export interface BillingInterface {
 
 export interface CreateBillingRequest {
 	companyName: string;
-	vehicleId: string;
+	vehicleId?: string; // Keep for backward compatibility
+	vehicleIds?: string[]; // New field for multiple vehicles
 	billingDate?: Date;
 	recipientName: string;
 	recipientAddress: string;
@@ -33,7 +35,8 @@ export interface CreateBillingRequest {
 
 export interface UpdateBillingRequest {
 	companyName?: string;
-	vehicleId?: string;
+	vehicleId?: string; // Keep for backward compatibility
+	vehicleIds?: string[]; // New field for multiple vehicles
 	billingDate?: Date;
 	recipientName?: string;
 	recipientAddress?: string;

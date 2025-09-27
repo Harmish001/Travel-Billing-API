@@ -3,7 +3,8 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface BillingDocument extends Document {
 	userId: mongoose.Types.ObjectId;
 	companyName: string;
-	vehicleId: mongoose.Types.ObjectId;
+	vehicleId: mongoose.Types.ObjectId; // Primary vehicle (backward compatibility)
+	vehicleIds?: mongoose.Types.ObjectId[]; // Support for multiple vehicles
 	billingDate: Date;
 	recipientName: string;
 	recipientAddress: string;
@@ -39,6 +40,12 @@ const billingSchema = new Schema<BillingDocument>(
 			required: [true, "Vehicle ID is required"],
 			index: true // Index for faster queries by vehicle
 		},
+		// Adding support for multiple vehicles
+		vehicleIds: [{
+			type: Schema.Types.ObjectId,
+			ref: "Vehicle",
+			index: true
+		}],
 		billingDate: {
 			type: Date,
 			required: [true, "Billing date is required"],
@@ -192,7 +199,11 @@ billingSchema.statics.findByUserWithFilters = async function (
 	}
 
 	if (filters.vehicleId) {
-		query.vehicleId = filters.vehicleId;
+		// Search in both single vehicleId and multiple vehicleIds
+		query.$or = [
+			{ vehicleId: filters.vehicleId },
+			{ vehicleIds: filters.vehicleId }
+		];
 	}
 
 	if (filters.dateFrom || filters.dateTo) {
@@ -215,6 +226,7 @@ billingSchema.statics.findByUserWithFilters = async function (
 
 	const bills = await this.find(query)
 		.populate("vehicleId", "vehicleNumber")
+		.populate("vehicleIds", "vehicleNumber")
 		.sort({ createdAt: -1 })
 		.skip(skip)
 		.limit(limit)
@@ -240,6 +252,7 @@ billingSchema.statics.getBillingStats = async function (userId: string) {
 
 	const recentBills = await this.find({ userId, isCompleted: true })
 		.populate("vehicleId", "vehicleNumber")
+		.populate("vehicleIds", "vehicleNumber")
 		.sort({ createdAt: -1 })
 		.limit(5)
 		.lean();
