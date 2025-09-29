@@ -1,23 +1,31 @@
 import mongoose, { Document, Schema } from "mongoose";
+import { BillingItem } from "../types/billing";
 
+export interface BankDetails {
+	bankName: string;
+	branch: string;
+	accountNumber: string;
+	ifscCode: string;
+}
+
+export interface BillingModel {}
 export interface BillingDocument extends Document {
 	userId: mongoose.Types.ObjectId;
 	companyName: string;
-	vehicleId: mongoose.Types.ObjectId; // Primary vehicle (backward compatibility)
-	vehicleIds?: mongoose.Types.ObjectId[]; // Support for multiple vehicles
 	billingDate: Date;
 	recipientName: string;
 	recipientAddress: string;
+	vehicleIds?: mongoose.Types.ObjectId[];
 	workingTime: string;
-	hsnCode: string;
-	quantity: number;
-	rate: number;
-	subtotal: number;
-	taxAmount: number;
-	total: number;
-	isCompleted: boolean;
+	period: string;
+	projectLocation: string;
+	placeOfSupply: string;
+	billingItems: BillingItem[];
+	totalInvoiceValue: number;
+	bankDetails: BankDetails;
 	createdAt: Date;
 	updatedAt: Date;
+	isCompleted: boolean;
 }
 
 const billingSchema = new Schema<BillingDocument>(
@@ -34,18 +42,14 @@ const billingSchema = new Schema<BillingDocument>(
 			trim: true,
 			maxlength: [100, "Company name must be less than 100 characters"]
 		},
-		vehicleId: {
-			type: Schema.Types.ObjectId,
-			ref: "Vehicle",
-			required: [true, "Vehicle ID is required"],
-			index: true // Index for faster queries by vehicle
-		},
 		// Adding support for multiple vehicles
-		vehicleIds: [{
-			type: Schema.Types.ObjectId,
-			ref: "Vehicle",
-			index: true
-		}],
+		vehicleIds: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "Vehicle",
+				index: true
+			}
+		],
 		billingDate: {
 			type: Date,
 			required: [true, "Billing date is required"],
@@ -69,41 +73,37 @@ const billingSchema = new Schema<BillingDocument>(
 			trim: true,
 			maxlength: [50, "Working time must be less than 50 characters"]
 		},
-		hsnCode: {
+		period: {
 			type: String,
-			required: [true, "HSN/ASC code is required"],
-			trim: true,
-			default: "996601",
-			maxlength: [10, "HSN code must be less than 10 characters"]
+			required: [true, "Period is required"],
+			trim: true
 		},
-		quantity: {
-			type: Number,
-			required: [true, "Quantity is required"],
-			min: [0.01, "Quantity must be greater than 0"],
-			max: [999999, "Quantity must be less than 1,000,000"],
-			default: 1
+		projectLocation: {
+			type: String,
+			required: [true, "Project location is required"],
+			trim: true
 		},
-		rate: {
-			type: Number,
-			required: [true, "Rate is required"],
-			min: [0.01, "Rate must be greater than 0"],
-			max: [999999999, "Rate must be less than 1 billion"]
+		placeOfSupply: {
+			type: String,
+			required: [true, "Place of supply is required"],
+			trim: true
 		},
-		subtotal: {
-			type: Number,
-			required: [true, "Subtotal is required"],
-			min: [0, "Subtotal cannot be negative"]
-		},
-		taxAmount: {
-			type: Number,
-			required: [true, "Tax amount is required"],
-			min: [0, "Tax amount cannot be negative"],
-			default: 0
-		},
-		total: {
-			type: Number,
-			required: [true, "Total is required"],
-			min: [0, "Total cannot be negative"]
+		billingItems: [
+			{
+				description: { type: String, required: true },
+				hsnSac: { type: String, required: true },
+				unit: { type: String, required: true },
+				quantity: { type: Number, required: true },
+				rate: { type: Number, required: true },
+				totalAmount: { type: Number, required: true }
+			}
+		],
+		totalInvoiceValue: { type: Number, required: true },
+		bankDetails: {
+			bankName: { type: String, required: true },
+			branch: { type: String, required: true },
+			accountNumber: { type: String, required: true },
+			ifscCode: { type: String, required: true }
 		},
 		isCompleted: {
 			type: Boolean,
@@ -127,45 +127,6 @@ billingSchema.index({
 	companyName: "text",
 	recipientName: "text",
 	workingTime: "text"
-});
-
-// Auto-calculate fields before saving
-billingSchema.pre("save", function (next) {
-	// Calculate subtotal
-	this.subtotal = Number((this.quantity * this.rate).toFixed(2));
-
-	// Calculate tax (18% GST for Indian market - can be configurable)
-	const taxRate = 0.18; // 18% GST
-	this.taxAmount = Number((this.subtotal * taxRate).toFixed(2));
-
-	// Calculate total
-	this.total = Number((this.subtotal + this.taxAmount).toFixed(2));
-
-	next();
-});
-
-// Auto-calculate fields before updating
-billingSchema.pre("findOneAndUpdate", function (next) {
-	const update = this.getUpdate() as any;
-
-	if (update && (update.quantity !== undefined || update.rate !== undefined)) {
-		const quantity = update.quantity || 1;
-		const rate = update.rate || 0;
-
-		// Calculate subtotal
-		const subtotal = Number((quantity * rate).toFixed(2));
-		update.subtotal = subtotal;
-
-		// Calculate tax (18% GST)
-		const taxRate = 0.18;
-		const taxAmount = Number((subtotal * taxRate).toFixed(2));
-		update.taxAmount = taxAmount;
-
-		// Calculate total
-		update.total = Number((subtotal + taxAmount).toFixed(2));
-	}
-
-	next();
 });
 
 // Don't return __v in JSON responses
@@ -199,11 +160,8 @@ billingSchema.statics.findByUserWithFilters = async function (
 	}
 
 	if (filters.vehicleId) {
-		// Search in both single vehicleId and multiple vehicleIds
-		query.$or = [
-			{ vehicleId: filters.vehicleId },
-			{ vehicleIds: filters.vehicleId }
-		];
+		// Search in vehicleIds array
+		query.vehicleIds = filters.vehicleId;
 	}
 
 	if (filters.dateFrom || filters.dateTo) {
@@ -225,7 +183,6 @@ billingSchema.statics.findByUserWithFilters = async function (
 	}
 
 	const bills = await this.find(query)
-		.populate("vehicleId", "vehicleNumber")
 		.populate("vehicleIds", "vehicleNumber")
 		.sort({ createdAt: -1 })
 		.skip(skip)
@@ -251,7 +208,6 @@ billingSchema.statics.getBillingStats = async function (userId: string) {
 	const totalBills = await this.countDocuments({ userId, isCompleted: true });
 
 	const recentBills = await this.find({ userId, isCompleted: true })
-		.populate("vehicleId", "vehicleNumber")
 		.populate("vehicleIds", "vehicleNumber")
 		.sort({ createdAt: -1 })
 		.limit(5)
@@ -262,7 +218,7 @@ billingSchema.statics.getBillingStats = async function (userId: string) {
 		{
 			$match: { userId: new mongoose.Types.ObjectId(userId), isCompleted: true }
 		},
-		{ $group: { _id: null, totalRevenue: { $sum: "$total" } } }
+		{ $group: { _id: null, totalRevenue: { $sum: "$totalInvoiceValue" } } }
 	]);
 
 	const totalRevenue =
@@ -287,7 +243,7 @@ billingSchema.statics.getBillingStats = async function (userId: string) {
 				createdAt: { $gte: startOfMonth }
 			}
 		},
-		{ $group: { _id: null, monthlyRevenue: { $sum: "$total" } } }
+		{ $group: { _id: null, monthlyRevenue: { $sum: "$totalInvoiceValue" } } }
 	]);
 
 	const monthlyRevenue =

@@ -1,20 +1,35 @@
 // Billing-related interfaces
+export interface BillingItem {
+	description: string;
+	hsnSac: string;
+	unit: string;
+	quantity: number;
+	rate: number;
+	totalAmount: number;
+}
+
+export interface BankDetails {
+	bankName: string;
+	branch: string;
+	accountNumber: string;
+	ifscCode: string;
+}
+
 export interface BillingInterface {
 	_id?: string;
 	userId: string;
 	companyName: string;
-	vehicleId: string;
 	vehicleIds?: string[]; // Support for multiple vehicles
 	billingDate: Date;
 	recipientName: string;
 	recipientAddress: string;
 	workingTime: string;
-	hsnCode: string;
-	quantity: number;
-	rate: number;
-	subtotal: number;
-	taxAmount: number;
-	total: number;
+	period: string;
+	projectLocation: string;
+	placeOfSupply: string;
+	billingItems: BillingItem[];
+	totalInvoiceValue: number;
+	bankDetails: BankDetails;
 	isCompleted: boolean;
 	createdAt?: Date;
 	updatedAt?: Date;
@@ -22,28 +37,31 @@ export interface BillingInterface {
 
 export interface CreateBillingRequest {
 	companyName: string;
-	vehicleId?: string; // Keep for backward compatibility
-	vehicleIds?: string[]; // New field for multiple vehicles
+	vehicleIds: string[]; // Required field for multiple vehicles
 	billingDate?: Date;
 	recipientName: string;
 	recipientAddress: string;
 	workingTime: string;
-	hsnCode?: string;
-	quantity?: number;
-	rate: number;
+	period: string;
+	projectLocation: string;
+	placeOfSupply: string;
+	billingItems: BillingItem[];
+	bankDetails: BankDetails;
 }
 
 export interface UpdateBillingRequest {
 	companyName?: string;
-	vehicleId?: string; // Keep for backward compatibility
-	vehicleIds?: string[]; // New field for multiple vehicles
+	vehicleIds?: string[];
 	billingDate?: Date;
 	recipientName?: string;
 	recipientAddress?: string;
 	workingTime?: string;
-	hsnCode?: string;
-	quantity?: number;
-	rate?: number;
+	period?: string;
+	projectLocation?: string;
+	placeOfSupply?: string;
+	billingItems?: BillingItem[];
+	bankDetails?: BankDetails;
+	totalInvoiceValue?: number;
 }
 
 export interface BillingSearchFilters {
@@ -79,10 +97,7 @@ export interface BillingStatsResponse {
 export interface BillingCalculation {
 	quantity: number;
 	rate: number;
-	subtotal: number;
-	taxAmount: number;
-	total: number;
-	taxRate: number;
+	totalAmount: number;
 }
 
 export interface BillingExportRequest {

@@ -6,26 +6,20 @@ import { AuthRequest } from "../middleware/auth";
 // import { PDFService } from "../utils/pdf.service";
 // import { ExcelService } from "../utils/excel.service.simple";
 import { ApiResponse } from "../types";
-import { BillingCalculation, BillingPaginationResponse, BillingSearchFilters, BillingStatsResponse, CreateBillingRequest, UpdateBillingRequest } from "../types/billing";
+import { BillingCalculation, BillingPaginationResponse, BillingSearchFilters, BillingStatsResponse, CreateBillingRequest, UpdateBillingRequest, BillingItem, BankDetails } from "../types/billing";
 
-// Helper function to calculate billing amounts
-const calculateBillingAmounts = (
+// Helper function to calculate billing amounts for a single item
+const calculateBillingItemAmounts = (
 	quantity: number,
 	rate: number
-): BillingCalculation => {
-	const subtotal = Number((quantity * rate).toFixed(2));
-	const taxRate = 0.18; // 18% GST
-	const taxAmount = Number((subtotal * taxRate).toFixed(2));
-	const total = Number((subtotal + taxAmount).toFixed(2));
+): { totalAmount: number } => {
+	const totalAmount = Number((quantity * rate).toFixed(2));
+	return { totalAmount };
+};
 
-	return {
-		quantity,
-		rate,
-		subtotal,
-		taxAmount,
-		total,
-		taxRate
-	};
+// Helper function to calculate total invoice value from billing items
+const calculateTotalInvoiceValue = (billingItems: BillingItem[]): number => {
+	return Number(billingItems.reduce((sum, item) => sum + item.totalAmount, 0).toFixed(2));
 };
 
 // Create a new billing
@@ -36,15 +30,16 @@ export const createBilling = async (
 	try {
 		const {
 			companyName,
-			vehicleId,
 			vehicleIds,
 			billingDate,
 			recipientName,
 			recipientAddress,
 			workingTime,
-			hsnCode = "996601",
-			quantity = 1,
-			rate
+			period,
+			projectLocation,
+			placeOfSupply,
+			billingItems,
+			bankDetails
 		}: CreateBillingRequest = req.body;
 
 		const userId = req.user?._id;
@@ -62,11 +57,16 @@ export const createBilling = async (
 		// Validate required fields
 		if (
 			!companyName ||
-			(!vehicleId && (!vehicleIds || vehicleIds.length === 0)) ||
+			(!vehicleIds || vehicleIds.length === 0) ||
 			!recipientName ||
 			!recipientAddress ||
 			!workingTime ||
-			!rate
+			!period ||
+			!projectLocation ||
+			!placeOfSupply ||
+			!billingItems || 
+			billingItems.length === 0 ||
+			!bankDetails
 		) {
 			const response: ApiResponse = {
 				status: false,
@@ -77,64 +77,54 @@ export const createBilling = async (
 			return;
 		}
 
-		// Validate numeric fields
-		if (quantity <= 0 || rate <= 0) {
+		// Validate billing items
+		for (const item of billingItems) {
+			if (!item.description || !item.hsnSac || !item.unit || item.quantity <= 0 || item.rate <= 0) {
+				const response: ApiResponse = {
+					status: false,
+					message: "All billing item fields must be valid",
+					data: null
+				};
+				res.status(400).json(response);
+				return;
+			}
+			
+			// Calculate total amount for each item
+			const { totalAmount } = calculateBillingItemAmounts(item.quantity, item.rate);
+			item.totalAmount = totalAmount;
+		}
+
+		// Validate bank details
+		if (!bankDetails.bankName || !bankDetails.branch || !bankDetails.accountNumber || !bankDetails.ifscCode) {
 			const response: ApiResponse = {
 				status: false,
-				message: "Quantity and rate must be greater than 0",
+				message: "All bank details must be provided",
 				data: null
 			};
 			res.status(400).json(response);
 			return;
 		}
 
-		// Verify that the vehicle(s) belong to the user
-		let vehicleIdsToUse: string[] = [];
+		// Verify that all vehicles belong to the user
+		const vehicles = await Vehicle.find({ 
+			_id: { $in: vehicleIds }, 
+			userId 
+		});
 		
-		// Handle single vehicleId (backward compatibility)
-		if (vehicleId && !vehicleIds) {
-			const vehicle = await Vehicle.findOne({ _id: vehicleId, userId });
-			if (!vehicle) {
-				const response: ApiResponse = {
-					status: false,
-					message: "Vehicle not found or doesn't belong to user",
-					data: null
-				};
-				res.status(404).json(response);
-				return;
-			}
-			vehicleIdsToUse = [vehicleId];
-		}
-		// Handle multiple vehicleIds
-		else if (vehicleIds && vehicleIds.length > 0) {
-			// Verify all vehicles belong to the user
-			const vehicles = await Vehicle.find({ 
-				_id: { $in: vehicleIds }, 
-				userId 
-			});
-			
-			if (vehicles.length !== vehicleIds.length) {
-				const response: ApiResponse = {
-					status: false,
-					message: "One or more vehicles not found or don't belong to user",
-					data: null
-				};
-				res.status(404).json(response);
-				return;
-			}
-			
-			vehicleIdsToUse = vehicleIds;
-		} else {
+		if (vehicles.length !== vehicleIds.length) {
 			const response: ApiResponse = {
 				status: false,
-				message: "Either vehicleId or vehicleIds must be provided",
+				message: "One or more vehicles not found or don't belong to user",
 				data: null
 			};
-			res.status(400).json(response);
+			res.status(404).json(response);
 			return;
 		}
 
-		// Create billing with support for multiple vehicles
+		// Calculate total invoice value
+		const totalInvoiceValue = calculateTotalInvoiceValue(billingItems);
+
+		// Create billing with support for multiple vehicles and billing items
 		const billingData: any = {
 			userId,
 			companyName: companyName.trim(),
@@ -142,27 +132,22 @@ export const createBilling = async (
 			recipientName: recipientName.trim(),
 			recipientAddress: recipientAddress.trim(),
 			workingTime: workingTime.trim(),
-			hsnCode: hsnCode.trim(),
-			quantity,
-			rate,
+			period: period.trim(),
+			projectLocation: projectLocation.trim(),
+			placeOfSupply: placeOfSupply.trim(),
+			billingItems,
+			bankDetails,
+			totalInvoiceValue,
 			isCompleted: true
 		};
 
-		// Set vehicleId (single) or vehicleIds (multiple) based on what was provided
-		if (vehicleIdsToUse.length === 1) {
-			billingData.vehicleId = vehicleIdsToUse[0];
-		} else {
-			billingData.vehicleId = vehicleIdsToUse[0]; // Keep first as primary
-			billingData.vehicleIds = vehicleIdsToUse; // Store all vehicles
-		}
+		// Set vehicleIds (multiple)
+		billingData.vehicleIds = vehicleIds;
 
 		const billing = await Billing.create(billingData);
 
 		// Populate vehicle information
-		await billing.populate("vehicleId", "vehicleNumber");
-		if (vehicleIdsToUse.length > 1) {
-			await billing.populate("vehicleIds", "vehicleNumber");
-		}
+		await billing.populate("vehicleIds", "vehicleNumber");
 
 		const response: ApiResponse = {
 			status: true,
@@ -287,9 +272,6 @@ export const getBillingById = async (
 		}
 
 		const billing = await Billing.findOne({ _id: id, userId }).populate(
-			"vehicleId",
-			"vehicleNumber"
-		).populate(
 			"vehicleIds",
 			"vehicleNumber"
 		);
@@ -342,23 +324,6 @@ export const updateBilling = async (
 			return;
 		}
 
-		// If vehicleId is being updated, verify it belongs to the user
-		if (updateData.vehicleId && !updateData.vehicleIds) {
-			const vehicle = await Vehicle.findOne({
-				_id: updateData.vehicleId,
-				userId
-			});
-			if (!vehicle) {
-				const response: ApiResponse = {
-					status: false,
-					message: "Vehicle not found or doesn't belong to user",
-					data: null
-				};
-				res.status(404).json(response);
-				return;
-			}
-		}
-		
 		// If vehicleIds is being updated, verify all vehicles belong to the user
 		if (updateData.vehicleIds && updateData.vehicleIds.length > 0) {
 			const vehicles = await Vehicle.find({ 
@@ -377,25 +342,42 @@ export const updateBilling = async (
 			}
 		}
 
-		// Validate numeric fields if provided
-		if (updateData.quantity !== undefined && updateData.quantity <= 0) {
-			const response: ApiResponse = {
-				status: false,
-				message: "Quantity must be greater than 0",
-				data: null
-			};
-			res.status(400).json(response);
-			return;
-		}
+		// Validate billing items if provided
+		if (updateData.billingItems && updateData.billingItems.length > 0) {
+			for (const item of updateData.billingItems) {
+				if (item.quantity !== undefined && item.quantity <= 0) {
+					const response: ApiResponse = {
+						status: false,
+						message: "Quantity must be greater than 0",
+						data: null
+					};
+					res.status(400).json(response);
+					return;
+				}
 
-		if (updateData.rate !== undefined && updateData.rate <= 0) {
-			const response: ApiResponse = {
-				status: false,
-				message: "Rate must be greater than 0",
-				data: null
-			};
-			res.status(400).json(response);
-			return;
+				if (item.rate !== undefined && item.rate <= 0) {
+					const response: ApiResponse = {
+						status: false,
+						message: "Rate must be greater than 0",
+						data: null
+					};
+					res.status(400).json(response);
+					return;
+				}
+				
+				// Recalculate total amount if quantity or rate is updated
+				if (item.quantity !== undefined || item.rate !== undefined) {
+					const quantity = item.quantity || 1;
+					const rate = item.rate || 0;
+					const { totalAmount } = calculateBillingItemAmounts(quantity, rate);
+					item.totalAmount = totalAmount;
+				}
+			}
+			
+			// Recalculate total invoice value
+			if (updateData.billingItems) {
+				updateData.totalInvoiceValue = calculateTotalInvoiceValue(updateData.billingItems);
+			}
 		}
 
 		// Clean string fields
@@ -408,7 +390,12 @@ export const updateBilling = async (
 			cleanedData.recipientAddress = cleanedData.recipientAddress.trim();
 		if (cleanedData.workingTime)
 			cleanedData.workingTime = cleanedData.workingTime.trim();
-		if (cleanedData.hsnCode) cleanedData.hsnCode = cleanedData.hsnCode.trim();
+		if (cleanedData.period)
+			cleanedData.period = cleanedData.period.trim();
+		if (cleanedData.projectLocation)
+			cleanedData.projectLocation = cleanedData.projectLocation.trim();
+		if (cleanedData.placeOfSupply)
+			cleanedData.placeOfSupply = cleanedData.placeOfSupply.trim();
 		if (cleanedData.billingDate)
 			cleanedData.billingDate = new Date(cleanedData.billingDate);
 
@@ -416,7 +403,7 @@ export const updateBilling = async (
 			{ _id: id, userId },
 			cleanedData,
 			{ new: true, runValidators: true }
-		).populate("vehicleId", "vehicleNumber").populate("vehicleIds", "vehicleNumber");
+		).populate("vehicleIds", "vehicleNumber");
 
 		if (!billing) {
 			const response: ApiResponse = {
@@ -483,7 +470,7 @@ export const deleteBilling = async (
 			_id: id,
 			userId,
 			isCompleted: true
-		}).populate("vehicleId", "vehicleNumber").populate("vehicleIds", "vehicleNumber");
+		}).populate("vehicleIds", "vehicleNumber");
 
 		if (!billing) {
 			const response: ApiResponse = {
@@ -580,12 +567,12 @@ export const calculateBilling = async (
 			return;
 		}
 
-		const calculation = calculateBillingAmounts(quantity, rate);
+		const { totalAmount } = calculateBillingItemAmounts(quantity, rate);
 
-		const response: ApiResponse<BillingCalculation> = {
+		const response: ApiResponse<{ totalAmount: number }> = {
 			status: true,
 			message: "Billing calculation completed",
-			data: calculation
+			data: { totalAmount }
 		};
 
 		res.status(200).json(response);
