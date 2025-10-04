@@ -3,10 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import passport from "passport";
 import connectDB from "./config/db";
-import "./config/passport"; // Initialize passport strategies
-import authRoutes from "./routes/auth";
-import vehicleRoutes from "./routes/vehicle.routes";
-import billingRoutes from "./routes/billing.routes";
+import "./config/passport";
+import "./utils/helpers";
 import registerdRoutes from "./routes";
 
 dotenv.config();
