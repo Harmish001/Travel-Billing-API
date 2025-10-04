@@ -55,6 +55,7 @@ export const createBilling = async (
 		}
 
 		// Validate required fields
+		console.log(req.body)
 		if (
 			!companyName ||
 			(!vehicleIds || vehicleIds.length === 0) ||
