@@ -10,7 +10,7 @@ import registerdRoutes from "./routes";
 dotenv.config();
 
 const app: Express = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 6000;
 
 // Middleware
 app.use(

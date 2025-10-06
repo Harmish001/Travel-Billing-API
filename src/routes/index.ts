@@ -4,6 +4,7 @@ import vehicleRoutes from "../routes/vehicle.routes";
 import billingRoutes from "../routes/billing.routes";
 import settingsRoutes from "../routes/settings.routes";
 import driverRoutes from "../routes/driver.routes";
+import bookingRoutes from "../routes/booking.routes";
 
 const registerdRoutes = (app: Application) => {
 	const router: Router = Router();
@@ -12,6 +13,7 @@ const registerdRoutes = (app: Application) => {
 	router.use("/billings", billingRoutes);
 	router.use("/settings", settingsRoutes);
 	router.use("/drivers", driverRoutes);
+	router.use("/bookings", bookingRoutes);
 	// Health check route
 	router.get("/health", (req, res) => {
 		res.json({
