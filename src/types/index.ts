@@ -1,4 +1,5 @@
 import { Document } from "mongoose";
+import { DriverInterface, CreateDriverRequest, UpdateDriverRequest } from "./driver";
 
 export interface UserInterface {
   _id?: any;
@@ -30,3 +31,5 @@ export interface AuthResponseData {
   user: UserInterface;
   token: string;
 }
+
+export type { DriverInterface, CreateDriverRequest, UpdateDriverRequest };
