@@ -19,3 +19,9 @@ export interface UpdateDriverRequest {
 	driverPhoneNumber?: string;
 	driverImage?: string;
 }
+
+// Added interface for pagination query parameters
+export interface PaginationQuery {
+	page?: string;
+	limit?: string;
+}

@@ -9,6 +9,7 @@ export interface BookingDocument extends Document {
 	drop: string;
 	description: string;
 	vehicle: string;
+	status: "Pending" | "Completed" | "inProgress"; // Added status field
 }
 
 const bookingSchema = new Schema<BookingDocument>(
@@ -51,6 +52,12 @@ const bookingSchema = new Schema<BookingDocument>(
 			type: String,
 			required: [true, "Vehicle type is required"],
 			trim: true
+		},
+		// Added status field with default value
+		status: {
+			type: String,
+			enum: ["Pending", "Completed", "inProgress"],
+			default: "Pending"
 		}
 	},
 	{

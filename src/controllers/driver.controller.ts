@@ -5,7 +5,8 @@ import { AuthRequest } from "../middleware/auth";
 import {
 	CreateDriverRequest,
 	DriverInterface,
-	UpdateDriverRequest
+	UpdateDriverRequest,
+	PaginationQuery
 } from "../types/driver";
 
 export const createDriver = async (req: AuthRequest, res: Response) => {
@@ -74,12 +75,46 @@ export const getDriver = async (req: AuthRequest, res: Response) => {
 export const getAllDrivers = async (req: AuthRequest, res: Response) => {
 	try {
 		const userId = req.user!._id;
-		const drivers = await Driver.find({ userId });
-
-		const response: ApiResponse<DriverInterface[]> = {
+		const { page = "1", limit = "10" } = req.query as PaginationQuery;
+		
+		// Convert page and limit to numbers
+		const pageNum = parseInt(page as string, 10);
+		const limitNum = parseInt(limit as string, 10);
+		const skip = (pageNum - 1) * limitNum;
+		
+		// Find drivers with pagination
+		const drivers = await Driver.find({ userId })
+			.sort({ createdAt: -1 }) // Sort by creation date, newest first
+			.skip(skip)
+			.limit(limitNum);
+		
+		// Get total count for pagination
+		const totalDrivers = await Driver.countDocuments({ userId });
+		
+		const totalPages = Math.ceil(totalDrivers / limitNum);
+		
+		const response: ApiResponse<{
+			drivers: DriverInterface[];
+			pagination: {
+				currentPage: number;
+				totalPages: number;
+				totalDrivers: number;
+				hasNext: boolean;
+				hasPrev: boolean;
+			};
+		}> = {
 			status: true,
 			message: "Drivers retrieved successfully",
-			data: drivers
+			data: {
+				drivers,
+				pagination: {
+					currentPage: pageNum,
+					totalPages,
+					totalDrivers,
+					hasNext: pageNum < totalPages,
+					hasPrev: pageNum > 1
+				}
+			}
 		};
 
 		res.json(response);
