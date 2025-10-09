@@ -10,15 +10,29 @@ import registerdRoutes from "./routes";
 dotenv.config();
 
 const app: Express = express();
-const port = process.env.PORT || 6000;
+const port = process.env.PORT || 4000;
+
+// Configure CORS with more permissive settings for development
+const corsOptions = {
+	origin: process.env.FRONTEND_URL || "http://localhost:3000",
+	credentials: true,
+	optionsSuccessStatus: 200,
+	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+	allowedHeaders: [
+		"Origin",
+		"X-Requested-With",
+		"Content-Type",
+		"Accept",
+		"Authorization"
+	],
+	exposedHeaders: ["Content-Range", "X-Content-Range"]
+};
 
 // Middleware
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
+
+// Explicitly handle preflight requests for all routes
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -28,35 +42,35 @@ app.use(passport.initialize());
 // Connect to Database
 connectDB();
 
+// Register routes before starting server
+const router = registerdRoutes(app);
+app.use("/api", router);
+
 // Basic route
 app.get("/", (req, res) => {
-  res.json({
-    status: true,
-    message: "Product Management Server is running!",
-    data: {
-      version: "1.0.0",
-      environment: process.env.NODE_ENV || "development",
-    },
-  });
+	res.json({
+		status: true,
+		message: "Product Management Server is running!",
+		data: {
+			version: "1.0.0",
+			environment: process.env.NODE_ENV || "development"
+		}
+	});
 });
 
 // Global error handler
 app.use((err: any, req: any, res: any, next: any) => {
-  console.error("Global error:", err);
-  res.status(500).json({
-    status: false,
-    message: "Internal server error",
-    data:
-      process.env.NODE_ENV === "development" ? { error: err.message } : null,
-  });
+	console.error("Global error:", err);
+	res.status(500).json({
+		status: false,
+		message: "Internal server error",
+		data: process.env.NODE_ENV === "development" ? { error: err.message } : null
+	});
 });
 
 // Start server
 app.listen(port, () => {
-  console.log(`🚀 Server is running on port ${port}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔗 Health check: http://localhost:${port}/health`);
+	console.log(`🚀 Server is running on port ${port}`);
+	console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
+	console.log(`🔗 Health check: http://localhost:${port}/health`);
 });
-
-const router = registerdRoutes(app);
-app.use("/api", router);
