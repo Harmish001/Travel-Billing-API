@@ -36,7 +36,9 @@ const createTransporter = async () => {
 	const useOAuth2 =
 		process.env.GOOGLE_CLIENT_ID &&
 		process.env.GOOGLE_CLIENT_SECRET &&
-		process.env.GOOGLE_REFRESH_TOKEN;
+		(process.env.GOOGLE_REFRESH_TOKEN || cachedRefreshToken);
+
+	let transporter;
 
 	if (useOAuth2) {
 		try {
@@ -47,7 +49,7 @@ const createTransporter = async () => {
 			const oauth2Tokens = await getOAuth2Token(refreshToken);
 
 			// OAuth2 configuration
-			const transporter = nodemailer.createTransport({
+			transporter = nodemailer.createTransport({
 				host: process.env.SMTP_HOST || "smtp.gmail.com",
 				port: parseInt(process.env.SMTP_PORT || "465"),
 				secure: process.env.SMTP_SECURE === "true",
@@ -59,7 +61,10 @@ const createTransporter = async () => {
 					refreshToken: refreshToken,
 					accessToken: oauth2Tokens.accessToken,
 					expires: oauth2Tokens.expires
-				}
+				},
+				pool: true, // Enable connection pooling
+				maxConnections: 5, // Limit concurrent connections
+				maxMessages: 100 // Limit messages per connection
 			});
 
 			// Listen for token updates (optional)
@@ -73,20 +78,23 @@ const createTransporter = async () => {
 			throw error;
 		}
 	} else {
-		// Traditional SMTP configuration
-		const transporter = nodemailer.createTransport({
+		// Traditional SMTP configuration with connection pooling
+		transporter = nodemailer.createTransport({
 			host: process.env.SMTP_HOST || "smtp.gmail.com",
 			port: parseInt(process.env.SMTP_PORT || "587"),
 			secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
 			auth: {
 				user: process.env.SMTP_USER,
 				pass: process.env.SMTP_PASS
-			}
+			},
+			pool: true, // Enable connection pooling
+			maxConnections: 5, // Limit concurrent connections
+			maxMessages: 100 // Limit messages per connection
 		});
 
 		return transporter;
 	}
-};
+};;
 
 // Send booking confirmation email to the user
 export const sendBookingConfirmationEmail = async (
@@ -120,6 +128,12 @@ export const sendBookingConfirmationEmail = async (
 		};
 
 		const info = await transporter.sendMail(mailOptions);
+		
+		// Close transporter connection to prevent memory leaks
+		if (transporter.close) {
+			transporter.close();
+		}
+		
 		return { success: true, messageId: info.messageId };
 	} catch (error: any) {
 		console.error("Error sending booking confirmation email:", error);
@@ -158,6 +172,12 @@ export const sendBookingNotificationEmail = async (
 		};
 
 		const info = await transporter.sendMail(mailOptions);
+		
+		// Close transporter connection to prevent memory leaks
+		if (transporter.close) {
+			transporter.close();
+		}
+		
 		return { success: true, messageId: info.messageId };
 	} catch (error: any) {
 		console.error("Error sending booking notification email:", error);

@@ -45,12 +45,43 @@ export const createBooking = async (req: Request, res: Response) => {
 
 export const getAllBookings = async (req: Request, res: Response) => {
 	try {
-		const bookings = await Booking.find({});
+		// Implement pagination to prevent loading too much data into memory
+		const page = parseInt(req.query.page as string) || 1;
+		const limit = Math.min(parseInt(req.query.limit as string) || 10, 50); // Max 50 items per page
+		const skip = (page - 1) * limit;
 
-		const response: ApiResponse<BookingInterface[]> = {
+		// Get bookings with pagination
+		const bookings = await Booking.find({})
+			.sort({ createdAt: -1 }) // Sort by creation date
+			.skip(skip)
+			.limit(limit);
+
+		// Get total count for pagination
+		const totalBookings = await Booking.countDocuments({});
+		const totalPages = Math.ceil(totalBookings / limit);
+
+		const response: ApiResponse<{
+			bookings: BookingInterface[];
+			pagination: {
+				currentPage: number;
+				totalPages: number;
+				totalBookings: number;
+				hasNext: boolean;
+				hasPrev: boolean;
+			};
+		}> = {
 			status: true,
 			message: "Bookings retrieved successfully",
-			data: bookings
+			data: {
+				bookings,
+				pagination: {
+					currentPage: page,
+					totalPages,
+					totalBookings,
+					hasNext: page < totalPages,
+					hasPrev: page > 1
+				}
+			}
 		};
 
 		res.json(response);
@@ -62,7 +93,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
 		};
 		res.status(500).json(response);
 	}
-};
+};;
 
 export const getRangewiseBookings = async (req: Request, res: Response) => {
 	try {

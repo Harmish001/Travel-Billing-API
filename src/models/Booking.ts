@@ -73,4 +73,7 @@ const bookingSchema = new Schema<BookingDocument>(
 
 const Booking = mongoose.model<BookingDocument>("Booking", bookingSchema);
 
+// Add indexes for better query performance
+Booking.createIndexes();
+
 export default Booking;

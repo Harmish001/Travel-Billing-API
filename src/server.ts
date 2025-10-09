@@ -7,7 +7,34 @@ import "./config/passport";
 import "./utils/helpers";
 import registerdRoutes from "./routes";
 
+// Import Node.js built-in modules for memory monitoring
+import os from "os";
+import process from "process";
+
+// Import memory cleanup utility
+import { startMemoryMonitoring } from "./utils/memory.cleanup";
+
 dotenv.config();
+
+// Memory monitoring function
+const logMemoryUsage = () => {
+	const usage = process.memoryUsage();
+	const usageMB = {
+		rss: Math.round((usage.rss / 1024 / 1024) * 100) / 100,
+		heapTotal: Math.round((usage.heapTotal / 1024 / 1024) * 100) / 100,
+		heapUsed: Math.round((usage.heapUsed / 1024 / 1024) * 100) / 100,
+		external: Math.round((usage.external / 1024 / 1024) * 100) / 100
+	};
+	console.log("Memory Usage (MB):", usageMB);
+};
+
+// Start memory monitoring
+startMemoryMonitoring(60000); // Check every minute
+
+// Log memory usage every 30 seconds in development
+if (process.env.NODE_ENV !== "production") {
+	setInterval(logMemoryUsage, 30000);
+}
 
 const app: Express = express();
 const port = process.env.PORT || 4000;
@@ -33,8 +60,41 @@ app.use(cors(corsOptions));
 
 // Explicitly handle preflight requests for all routes
 app.options("*", cors(corsOptions));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// Reduced payload limits to prevent memory issues
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Compression middleware to reduce response size
+app.use((req, res, next) => {
+	res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+	res.setHeader("Pragma", "no-cache");
+	res.setHeader("Expires", "0");
+	next();
+});
+
+// Set timeout to prevent hanging requests
+app.use((req, res, next) => {
+	// Reduce timeout to 15 seconds to prevent memory buildup
+	req.setTimeout(15000, () => {
+		if (!res.headersSent) {
+			res.status(408).json({
+				status: false,
+				message: "Request Timeout",
+				data: null
+			});
+		}
+	});
+	res.setTimeout(15000, () => {
+		if (!res.headersSent) {
+			res.status(408).json({
+				status: false,
+				message: "Response Timeout",
+				data: null
+			});
+		}
+	});
+	next();
+});
 
 // Initialize Passport
 app.use(passport.initialize());
@@ -55,6 +115,30 @@ app.get("/", (req, res) => {
 			version: "1.0.0",
 			environment: process.env.NODE_ENV || "development"
 		}
+	});
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+	const memoryUsage = process.memoryUsage();
+	const healthData = {
+		status: "healthy",
+		timestamp: new Date().toISOString(),
+		uptime: process.uptime(),
+		memory: {
+			rss: Math.round((memoryUsage.rss / 1024 / 1024) * 100) / 100,
+			heapTotal: Math.round((memoryUsage.heapTotal / 1024 / 1024) * 100) / 100,
+			heapUsed: Math.round((memoryUsage.heapUsed / 1024 / 1024) * 100) / 100,
+			external: Math.round((memoryUsage.external / 1024 / 1024) * 100) / 100
+		},
+		environment: process.env.NODE_ENV || "development",
+		nodeVersion: process.version
+	};
+
+	res.status(200).json({
+		status: true,
+		message: "Server is healthy",
+		data: healthData
 	});
 });
 
