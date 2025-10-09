@@ -7,9 +7,9 @@
     "build": "tsc",
     "build:prod": "npm run clean && tsc",
     "clean": "rimraf dist",
-    "start": "node --max-old-space-size=512 dist/server.js",
-    "start:optimized": "node --max-old-space-size=512 --optimize_for_size --gc_interval=100 dist/server.js",
-    "start:prod": "npm run build:prod && node --max-old-space-size=512 dist/server.js"
+    "start": "node --max-old-space-size=4096 dist/server.js",
+    "start:optimized": "node --max-old-space-size=4096 --optimize_for_size --gc_interval=100 dist/server.js",
+    "start:prod": "npm run build:prod && node --max-old-space-size=4096 dist/server.js"
   },
   "dependencies": {
     "axios": "^1.12.2",
