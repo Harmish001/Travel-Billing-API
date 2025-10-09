@@ -6,6 +6,7 @@ import {
 	BookingInterface,
 	DateRangeQuery
 } from "../types/booking";
+import { sendBookingConfirmationEmail, sendBookingNotificationEmail } from "../utils/email.service";
 import dayjs from "dayjs";
 
 export const createBooking = async (req: Request, res: Response) => {
@@ -15,6 +16,15 @@ export const createBooking = async (req: Request, res: Response) => {
 		const newBooking = new Booking(bookingData);
 
 		const savedBooking = await newBooking.save();
+
+		// Send email notifications if email is provided
+		if (savedBooking.email) {
+			// Send confirmation email to the user
+			await sendBookingConfirmationEmail(savedBooking);
+			
+		}
+		// Send notification email to admin
+		await sendBookingNotificationEmail(savedBooking);
 
 		const response: ApiResponse<BookingInterface> = {
 			status: true,

@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export interface BookingDocument extends Document {
 	name: string;
+	email?: string;
 	phoneNumber: string;
 	date: Date;
 	time: string;
@@ -17,6 +18,11 @@ const bookingSchema = new Schema<BookingDocument>(
 		name: {
 			type: String,
 			required: [true, "Name is required"],
+			trim: true
+		},
+		email: {
+			type: String,
+			required: false,
 			trim: true
 		},
 		phoneNumber: {

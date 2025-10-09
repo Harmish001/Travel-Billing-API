@@ -1,6 +1,7 @@
 export interface BookingInterface {
 	_id?: string;
 	name: string;
+	email?: string;
 	phoneNumber: string;
 	date: Date;
 	time: string;
@@ -15,6 +16,7 @@ export interface BookingInterface {
 
 export interface CreateBookingRequest {
 	name: string;
+	email?: string;
 	phoneNumber: string;
 	date: Date;
 	time: string;
