@@ -14,6 +14,9 @@ import process from "process";
 // Import memory cleanup utility
 import { startMemoryMonitoring } from "./utils/memory.cleanup";
 
+// Import logger utility
+import { logAccess, logError, closeLogStreams } from "./utils/logger";
+
 dotenv.config();
 
 // Memory monitoring function
@@ -83,6 +86,23 @@ app.options("*", cors(corsOptions));
 // Reduced payload limits to prevent memory issues
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Logging middleware - captures all API requests
+app.use((req, res, next) => {
+	const startTime = Date.now();
+	
+	// Capture the original send function
+	const originalSend = res.send;
+	
+	// Override send function to capture response and calculate duration
+	res.send = function(body) {
+		const duration = Date.now() - startTime;
+		logAccess(req, res, duration);
+		return originalSend.call(this, body);
+	};
+	
+	next();
+});
 
 // Compression middleware to reduce response size
 app.use((req, res, next) => {
@@ -164,7 +184,7 @@ app.get("/health", (req, res) => {
 
 // Global error handler
 app.use((err: any, req: any, res: any, next: any) => {
-	console.error("Global error:", err);
+	logError(err, req);
 	res.status(500).json({
 		status: false,
 		message: "Internal server error",
@@ -172,9 +192,41 @@ app.use((err: any, req: any, res: any, next: any) => {
 	});
 });
 
+// Handle uncaught exceptions
+process.on("uncaughtException", (err) => {
+	logError(err);
+	console.error("Uncaught Exception:", err);
+	process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (reason, promise) => {
+	logError(reason);
+	console.error("Unhandled Rejection at:", promise, "reason:", reason);
+	process.exit(1);
+});
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+	console.log("SIGINT received, shutting down gracefully...");
+	closeLogStreams();
+	process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+	console.log("SIGTERM received, shutting down gracefully...");
+	closeLogStreams();
+	process.exit(0);
+});
+
 // Start server
-app.listen(port, () => {
+const server = app.listen(port, () => {
 	console.log(`🚀 Server is running on port ${port}`);
 	console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
 	console.log(`🔗 Health check: http://localhost:${port}/health`);
+});
+
+// Handle server shutdown
+server.on("close", () => {
+	closeLogStreams();
 });
