@@ -31,6 +31,7 @@ export interface BillingInterface {
 	totalInvoiceValue: number;
 	bankDetails: BankDetails;
 	isCompleted: boolean;
+	gstEnabled: boolean;
 	createdAt?: Date;
 	updatedAt?: Date;
 }
@@ -47,6 +48,7 @@ export interface CreateBillingRequest {
 	placeOfSupply: string;
 	billingItems: BillingItem[];
 	bankDetails: BankDetails;
+	gstEnabled?: boolean;
 }
 
 export interface UpdateBillingRequest {
@@ -62,6 +64,7 @@ export interface UpdateBillingRequest {
 	billingItems?: BillingItem[];
 	bankDetails?: BankDetails;
 	totalInvoiceValue?: number;
+	gstEnabled?: boolean;
 }
 
 export interface BillingSearchFilters {

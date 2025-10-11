@@ -26,6 +26,7 @@ export interface BillingDocument extends Document {
 	createdAt: Date;
 	updatedAt: Date;
 	isCompleted: boolean;
+	gstEnabled: boolean;
 }
 
 const billingSchema = new Schema<BillingDocument>(
@@ -109,6 +110,10 @@ const billingSchema = new Schema<BillingDocument>(
 			type: Boolean,
 			default: true,
 			index: true // Index for faster queries by completion status
+		},
+		gstEnabled: {
+			type: Boolean,
+			default: true
 		}
 	},
 	{

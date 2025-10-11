@@ -417,6 +417,7 @@ export const getVehicleTypes = async (
 			"Auto Rickshaw",
 			"Tempo Traveller",
 			"Trailer",
+			"Mini Bus",
 			"Other"
 		];
 

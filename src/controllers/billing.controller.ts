@@ -39,7 +39,8 @@ export const createBilling = async (
 			projectLocation,
 			placeOfSupply,
 			billingItems,
-			bankDetails
+			bankDetails,
+			gstEnabled
 		}: CreateBillingRequest = req.body;
 
 		const userId = req.user?._id;
@@ -139,7 +140,8 @@ export const createBilling = async (
 			billingItems,
 			bankDetails,
 			totalInvoiceValue,
-			isCompleted: true
+			isCompleted: true,
+			gstEnabled: gstEnabled !== undefined ? gstEnabled : true // Default to true if not provided
 		};
 
 		// Set vehicleIds (multiple)

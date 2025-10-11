@@ -1,5 +1,6 @@
 export type VehicleType = 
 	| "Car"
+	| "Mini Bus"
 	| "Truck"
 	| "Van"
 	| "Bus"

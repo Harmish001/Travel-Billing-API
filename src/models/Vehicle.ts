@@ -30,6 +30,7 @@ const vehicleSchema = new Schema<VehicleDocument>(
 			enum: {
 				values: [
 					"Car",
+					"Mini Bus",
 					"Truck",
 					"Van",
 					"Bus",
@@ -41,7 +42,7 @@ const vehicleSchema = new Schema<VehicleDocument>(
 					"Other"
 				],
 				message:
-					"Invalid vehicle type. Must be one of: Car, Truck, Van, Bus, Motorcycle, Auto Rickshaw, Tempo, Trailer, Tempo Traveller, Other"
+					"Invalid vehicle type. Must be one of: Car, Truck, Van, Bus, Motorcycle, Auto Rickshaw, Tempo, Trailer, Tempo Traveller, Mini Bus, Other"
 			}
 		}
 	},
