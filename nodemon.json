@@ -1,6 +1,6 @@
 {
-  "watch": ["src"],
-  "ext": "ts,json",
-  "ignore": ["src/**/*.spec.ts"],
-  "exec": "node --max-old-space-size=512 --optimize_for_size --gc_interval=100 -r ts-node/register src/server.ts"
+	"watch": ["src"],
+	"ext": "ts,json",
+	"ignore": ["src/**/*.spec.ts"],
+	"exec": "npm run dev:run"
 }
