@@ -39,9 +39,29 @@ if (process.env.NODE_ENV !== "production") {
 const app: Express = express();
 const port = process.env.PORT || 4000;
 
-// Configure CORS with more permissive settings for development
+// Configure CORS with dynamic origin checking
 const corsOptions = {
-	origin: process.env.FRONTEND_URL || "http://localhost:3000",
+	origin: function (
+		origin: string | undefined,
+		callback: (err: Error | null, allow?: boolean) => void
+	) {
+		// Allow requests with no origin (like mobile apps or curl requests)
+		if (!origin) return callback(null, true);
+
+		// List of allowed origins
+		const allowedOrigins = [
+			process.env.FRONTEND_URL,
+			"http://localhost:3000",
+			"https://saitravels.vercel.app"
+		].filter((url): url is string => url !== undefined); // Type guard to filter out undefined values
+
+		// Check if the origin is in our allowed list or if we're in development
+		if (allowedOrigins.includes(origin)) {
+			callback(null, true);
+		} else {
+			callback(new Error("Not allowed by CORS"));
+		}
+	},
 	credentials: true,
 	optionsSuccessStatus: 200,
 	methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
